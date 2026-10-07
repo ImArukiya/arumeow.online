@@ -225,6 +225,23 @@ body.entered .rise{animation-play-state:running}
 .status-dot{position:absolute;right:2px;bottom:2px;width:22px;height:22px;border-radius:50%;background:var(--st,#747f8d);
   border:4px solid var(--glass-solid);transition:background .5s}
 
+/* ---------- status bubble ---------- */
+.avatar-link{position:relative;display:block;width:100%;height:100%;border-radius:50%;text-decoration:none}
+.avatar-link .avatar{display:block;width:100%;height:100%}
+.status-bubble{position:absolute;bottom:calc(100% + 10px);right:-6px;min-width:max-content;max-width:220px;
+  padding:7px 11px;border-radius:12px 12px 2px 12px;
+  background:var(--glass-solid);border:1px solid var(--line);
+  color:var(--ink);font-size:11.5px;font-weight:600;line-height:1.45;white-space:normal;word-break:break-word;
+  box-shadow:0 8px 24px rgba(0,0,0,.45);
+  pointer-events:none;opacity:0;transform:translateY(4px) scale(.96);transform-origin:bottom right;
+  transition:opacity .22s var(--ease-out),transform .28s var(--ease-spring)}
+.status-bubble::after{content:"";position:absolute;bottom:-5px;right:10px;width:10px;height:10px;
+  background:var(--glass-solid);border-right:1px solid var(--line);border-bottom:1px solid var(--line);
+  clip-path:polygon(0 0,100% 100%,100% 0)}
+.status-bubble[hidden]{display:none}
+.avatar-link:hover .status-bubble,
+.avatar-link:focus-visible .status-bubble{opacity:1;transform:none;pointer-events:auto}
+
 /* ---------- body ---------- */
 .card-body{position:relative;padding:14px 28px 20px;transform-style:preserve-3d}
 .name{position:relative;display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-height:1.2em;margin:8px 0 8px;
@@ -234,7 +251,8 @@ body.entered .rise{animation-play-state:running}
 .name .caret.off{opacity:0;animation:none}
 .name.loading .txt{width:5.2ch;height:.55em;border-radius:10px;color:transparent;
   background:linear-gradient(100deg,var(--fill) 20%,var(--fill-2) 40%,var(--fill) 60%) 0 0/200% 100%;animation:shimmer 1.4s linear infinite}
-.bio{margin:0 0 10px;font-size:13.5px;line-height:1.65;color:var(--ink-2)}
+.bio{margin:0 0 10px;font-size:13.5px;line-height:1.65;color:var(--ink-2);
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden}
 .bio b{color:var(--ink);font-weight:700}
 .location{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:18px;font-size:12.5px;color:var(--ink-2)}
 .location svg{width:14px;height:14px;fill:var(--ink)}
@@ -878,14 +896,19 @@ html[data-theme="light"].lite{--glass:rgba(255,255,255,.92)}
           </header>
           <div class="avatar-wrap d4 rise" style="--i:0">
             <i class="ring" aria-hidden="true"></i>
-            <img class="avatar" id="discordAvatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="avatar" />
+            <a class="avatar-link" href="https://discord.com/users/1117914294928031848" target="_blank" rel="noopener noreferrer" aria-label="Open Discord profile">
+              <img class="avatar" id="discordAvatar" src="https://cdn.discordapp.com/embed/avatars/0.png" alt="avatar" />
+              <span class="status-bubble" id="statusBubble" hidden></span>
+            </a>
             <span class="status-dot" id="statusDot"></span>
           </div>
 
           <div class="card-body">
             <h1 class="name d3 rise loading" id="displayName" style="--i:1"><span class="txt">&nbsp;</span><i class="caret" aria-hidden="true"></i></h1>
-            <p class="bio d1 rise" style="--i:2">
-              19 ✿ JAP / FIN • Turning <b>20</b> in <b>July</b> ♡ • WE ♡ Tsunderes, Mahiru, Chii &amp; Waguri • PFP changes often
+            <p class="bio d1 rise" id="displayBio" style="--i:2">
+              19 / 07 year's old | Romantic | 🇯🇵 / 🇫🇮<br>
+              ♡ Anime Girl Simp / Perv Mind<br>
+              BLUE BOX, TONIKAWA, MDUD 4 LIFE
             </p>
             <div class="location d1 rise" style="--i:3">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z" /></svg>
@@ -1049,6 +1072,7 @@ const CONFIG = {
   discordUserId: "1117914294928031848", // Lanyard: https://github.com/Phineas/lanyard
   anilistUser: "RomGuyAruki",
   fallbackName: "Aruki",                // only shown if Discord can't be reached
+  bioKey: "bio",                        // Lanyard KV key holding your bio (DM ".set bio <text>" to the Lanyard bot)
   cacheMinutes: 10,                     // AniList data is cached in localStorage
 };
 
@@ -1961,8 +1985,9 @@ const nameFx = (() => {
 const presence = (() => {
   const card = dom.card;
   const n = {
-    name: $("#discordName"), line: $("#discordActivity"), chip: $("#statusChip"),
+    name: $("#discordName"), bio: $("#displayBio"), line: $("#discordActivity"), chip: $("#statusChip"),
     avatar: $("#discordAvatar"), banner: $("#discordBanner"),
+    bubble: $("#statusBubble"),
     wrap: $("#activityWrap"), act: $("#activity"),
     large: $("#actLarge"), small: $("#actSmall"), kind: $("#actKind"),
     aname: $("#actName"), detail: $("#actDetail"), state: $("#actState"),
@@ -2072,10 +2097,14 @@ const presence = (() => {
     }
     if (custom && (custom.state || custom.emoji)) {
       const emoji = custom.emoji && custom.emoji.name && !custom.emoji.id ? custom.emoji.name + " " : "";
-      n.line.textContent = (emoji + (custom.state || "")).trim() || statusLabel;
+      const text = (emoji + (custom.state || "")).trim() || statusLabel;
+      n.line.textContent = text;
+      n.bubble.textContent = text;
+      n.bubble.hidden = false;
       showActivity(null);
       return;
     }
+    n.bubble.hidden = true;
     n.line.textContent = statusLabel;
     showActivity(null);
   }
@@ -2087,6 +2116,8 @@ const presence = (() => {
     n.name.textContent = name;
     nameFx.set(name);
     titleTypewriter.setUsername(user.username || name);
+    const bio = data.kv && data.kv[CONFIG.bioKey];
+    if (bio) n.bio.innerHTML = esc(bio).replace(/:[a-zA-Z0-9_]+:/g, "").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").trim();
     let avatarUrl = null;
     if (user.id && user.avatar) {
       const ext = user.avatar.startsWith("a_") ? "gif" : "png";
